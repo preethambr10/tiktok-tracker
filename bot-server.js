@@ -1,28 +1,24 @@
 /**
  * TikTok Outreach Bot Server
  * ─────────────────────────────────────────────
- * 1. Polls Telegram every 2s for new messages
- * 2. Extracts TikTok usernames from links you send
- * 3. Saves them to reached.json
- * 4. Serves reached.json at PUBLIC URL
- *    so the GitHub Pages dashboard can read it
- *
- * HOW TO RUN ON RAILWAY:
- *   Just deploy! Railway will use the start script
+ * TeleBotHost Version - Uses webhooks instead of polling
+ * 
+ * HOW TO USE ON TELEBOTHOST:
+ * 1. Create new bot on TeleBotHost
+ * 2. Paste this entire code
+ * 3. Set environment variables (BOT_TOKEN, CHAT_ID)
+ * 4. Launch!
  */
 
 const fs      = require('fs');
 const path    = require('path');
-const http    = require('http');
 const https   = require('https');
 
 // ── CONFIG ────────────────────────────────────────────────────────
-// Use environment variables on Railway, fallback to hardcoded for local
+// TeleBotHost will set these automatically
 const BOT_TOKEN    = process.env.BOT_TOKEN || '8701558725:AAEHFB0hMfDlCVWKVHrTngXwcnegNbMUsIA';
 const CHAT_ID      = process.env.CHAT_ID || '2112600021';
 const REACHED_FILE = path.join(__dirname, 'reached.json');
-const PORT         = process.env.PORT || 3001;  // Railway sets PORT env variable
-const POLL_MS      = 2000;
 
 // ── INIT reached.json ─────────────────────────────────────────────
 if (!fs.existsSync(REACHED_FILE)) {
@@ -30,47 +26,9 @@ if (!fs.existsSync(REACHED_FILE)) {
   console.log('✅ Created reached.json');
 }
 
-// ── HTTP SERVER (serves reached.json to dashboard) ────────────────
-const server = http.createServer((req, res) => {
-  // Allow any origin to fetch (GitHub Pages, etc.)
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Content-Type', 'application/json');
-
-  if (req.method === 'OPTIONS') { 
-    res.writeHead(204); 
-    res.end(); 
-    return; 
-  }
-
-  if (req.url === '/reached' || req.url === '/reached.json') {
-    try {
-      const data = fs.readFileSync(REACHED_FILE, 'utf8');
-      res.writeHead(200);
-      res.end(data);
-    } catch {
-      res.writeHead(500);
-      res.end(JSON.stringify({ error: 'Could not read reached.json' }));
-    }
-  } else if (req.url === '/status') {
-    const data = loadReached();
-    res.writeHead(200);
-    res.end(JSON.stringify({ 
-      ok: true, 
-      reachedCount: data.reached.length, 
-      lastUpdated: data.lastUpdated 
-    }));
-  } else {
-    res.writeHead(404);
-    res.end(JSON.stringify({ error: 'Not found. Use /reached' }));
-  }
-});
-
-server.listen(PORT, () => {
-  const url = process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : `http://localhost:${PORT}`;
-  console.log(`🌐 Server running at ${url}`);
-  console.log(`   Dashboard should fetch reached accounts from ${url}/reached\n`);
-});
+// ── Serve reached.json for dashboard ─────────────────────────────
+// TeleBotHost automatically serves files from the 'public' folder
+// Create a 'public' folder and put your reached.json there, or use their built-in storage
 
 // ── Telegram API helpers ──────────────────────────────────────────
 function tgRequest(method, params = {}) {
@@ -114,7 +72,6 @@ function sendMessage(text) {
 
 // ── Extract TikTok username ───────────────────────────────────────
 function extractUsername(text) {
-  // Handles: https://tiktok.com/@user, @user, tiktok.com/@user, plain "user"
   const patterns = [
     /tiktok\.com\/@?([a-zA-Z0-9_.]+)/i,
     /^@([a-zA-Z0-9_.]+)$/,
@@ -141,130 +98,118 @@ function saveReached(data) {
   fs.writeFileSync(REACHED_FILE, JSON.stringify(data, null, 2));
 }
 
-// ── Telegram Poll Loop ────────────────────────────────────────────
-let offset = 0;
-
-async function poll() {
+// ── TELEBOTHOST WEBHOOK HANDLER ──────────────────────────────────
+// This is the main function that TeleBotHost calls when a message arrives
+Bot.onWebhook((update) => {
   try {
-    const data = await tgRequest('getUpdates', { 
-      offset, 
-      timeout: 10,  // Longer timeout for cloud
-      allowed_updates: ['message'] 
-    });
+    console.log('📩 Received update:', update);
     
-    if (!data.ok || !data.result.length) return;
+    const msg = update.message;
+    if (!msg || !msg.text) return;
 
-    for (const update of data.result) {
-      offset = update.update_id + 1;
-      const msg = update.message;
-      if (!msg || !msg.text) continue;
+    // Optional: Uncomment to restrict to specific chat
+    // const fromId = String(msg.chat.id);
+    // if (fromId !== CHAT_ID) return;
 
-      // const fromId = String(msg.chat.id);
-      // Commented out so anyone can use - remove // if you want to restrict
+    const text = msg.text.trim();
 
-      const text = msg.text.trim();
-
-      // ── Commands ──
-      if (text === '/start' || text === '/help') {
-        await sendMessage(
-          `👋 <b>TikTok Outreach Bot</b>\n\n` +
-          `Send me a TikTok link or @username to mark it as reached.\n\n` +
-          `You can also send <b>multiple links</b>, one per line!\n\n` +
-          `Commands:\n` +
-          `/stats — outreach stats\n` +
-          `/list — last 10 reached\n` +
-          `/reset — clear all data`
-        );
-        continue;
-      }
-
-      if (text === '/stats') {
-        const d = loadReached();
-        const pct = (d.reached.length / 10000 * 100).toFixed(1);
-        await sendMessage(
-          `📊 <b>Outreach Stats</b>\n\n` +
-          `✅ Reached: <b>${d.reached.length.toLocaleString()}</b> / 10,000\n` +
-          `📈 Progress: <b>${pct}%</b>\n` +
-          `⏳ Remaining: <b>${(10000 - d.reached.length).toLocaleString()}</b>\n` +
-          `🕒 Last updated: ${d.lastUpdated ? new Date(d.lastUpdated).toLocaleString() : 'never'}`
-        );
-        continue;
-      }
-
-      if (text === '/list') {
-        const d = loadReached();
-        const last10 = d.reached.slice(-10).reverse();
-        if (!last10.length) { 
-          await sendMessage('No accounts reached yet.'); 
-          continue; 
-        }
-        const list = last10.map((r, i) => `${i+1}. @${r.username}`).join('\n');
-        await sendMessage(`📋 <b>Last 10 Reached:</b>\n\n${list}`);
-        continue;
-      }
-
-      if (text === '/reset') {
-        saveReached({ reached: [], lastUpdated: new Date().toISOString() });
-        await sendMessage('🔄 All reached accounts cleared. Dashboard reset.');
-        continue;
-      }
-
-      // ── Handle single or multiple links (one per line) ──
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-      const d = loadReached();
-      const results = [];
-      let newCount = 0;
-
-      for (const line of lines) {
-        const username = extractUsername(line);
-        if (!username) {
-          results.push(`❌ Couldn't parse: ${line}`);
-          continue;
-        }
-        const already = d.reached.find(r => r.username === username);
-        if (already) {
-          results.push(`⚠️ Already reached: @${username}`);
-          continue;
-        }
-        d.reached.push({ 
-          username, 
-          timestamp: new Date().toISOString(), 
-          link: `https://tiktok.com/@${username}` 
-        });
-        results.push(`✅ Marked: @${username}`);
-        newCount++;
-        console.log(`[${new Date().toLocaleTimeString()}] Reached: @${username} (total: ${d.reached.length})`);
-      }
-
-      if (newCount > 0) {
-        saveReached(d);
-      }
-
-      const summary = results.join('\n');
-      const total = d.reached.length;
-      const pct = (total / 10000 * 100).toFixed(1);
-      await sendMessage(
-        `${summary}\n\n📊 Total reached: <b>${total.toLocaleString()}</b> / 10,000 (${pct}%)`
+    // ── Commands ──
+    if (text === '/start' || text === '/help') {
+      Bot.sendMessage(
+        `👋 <b>TikTok Outreach Bot</b>\n\n` +
+        `Send me a TikTok link or @username to mark it as reached.\n\n` +
+        `You can also send <b>multiple links</b>, one per line!\n\n` +
+        `Commands:\n` +
+        `/stats — outreach stats\n` +
+        `/list — last 10 reached\n` +
+        `/reset — clear all data`
       );
+      return;
     }
-  } catch (err) {
-    console.error(`[${new Date().toLocaleTimeString()}] Poll error:`, err.message);
-  }
-}
 
-// ── Start ─────────────────────────────────────────────────────────
+    if (text === '/stats') {
+      const d = loadReached();
+      const pct = (d.reached.length / 10000 * 100).toFixed(1);
+      Bot.sendMessage(
+        `📊 <b>Outreach Stats</b>\n\n` +
+        `✅ Reached: <b>${d.reached.length.toLocaleString()}</b> / 10,000\n` +
+        `📈 Progress: <b>${pct}%</b>\n` +
+        `⏳ Remaining: <b>${(10000 - d.reached.length).toLocaleString()}</b>\n` +
+        `🕒 Last updated: ${d.lastUpdated ? new Date(d.lastUpdated).toLocaleString() : 'never'}`
+      );
+      return;
+    }
+
+    if (text === '/list') {
+      const d = loadReached();
+      const last10 = d.reached.slice(-10).reverse();
+      if (!last10.length) { 
+        Bot.sendMessage('No accounts reached yet.'); 
+        return; 
+      }
+      const list = last10.map((r, i) => `${i+1}. @${r.username}`).join('\n');
+      Bot.sendMessage(`📋 <b>Last 10 Reached:</b>\n\n${list}`);
+      return;
+    }
+
+    if (text === '/reset') {
+      saveReached({ reached: [], lastUpdated: new Date().toISOString() });
+      Bot.sendMessage('🔄 All reached accounts cleared. Dashboard reset.');
+      return;
+    }
+
+    // ── Handle single or multiple links (one per line) ──
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const d = loadReached();
+    const results = [];
+    let newCount = 0;
+
+    for (const line of lines) {
+      const username = extractUsername(line);
+      if (!username) {
+        results.push(`❌ Couldn't parse: ${line}`);
+        continue;
+      }
+      const already = d.reached.find(r => r.username === username);
+      if (already) {
+        results.push(`⚠️ Already reached: @${username}`);
+        continue;
+      }
+      d.reached.push({ 
+        username, 
+        timestamp: new Date().toISOString(), 
+        link: `https://tiktok.com/@${username}` 
+      });
+      results.push(`✅ Marked: @${username}`);
+      newCount++;
+      console.log(`Reached: @${username} (total: ${d.reached.length})`);
+    }
+
+    if (newCount > 0) {
+      saveReached(d);
+    }
+
+    const summary = results.join('\n');
+    const total = d.reached.length;
+    const pct = (total / 10000 * 100).toFixed(1);
+    Bot.sendMessage(
+      `${summary}\n\n📊 Total reached: <b>${total.toLocaleString()}</b> / 10,000 (${pct}%)`
+    );
+  } catch (err) {
+    console.error('Error processing webhook:', err);
+  }
+});
+
+// ── Serve reached.json for dashboard ─────────────────────────────
+// TeleBotHost can serve static files - put reached.json in the 'public' folder
+// or use their built-in database. For simplicity, we'll keep using file storage
+
+// Start message
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log('  🤖 TikTok Outreach Bot Server');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log(`  Bot Token set    : ${BOT_TOKEN ? '✅ Yes' : '❌ No'}`);
 console.log(`  Telegram Chat ID : ${CHAT_ID}`);
-console.log(`  Polling every    : ${POLL_MS}ms`);
 console.log(`  Reached file     : ${REACHED_FILE}`);
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-
-// Send startup message (silently fail if not needed)
-sendMessage('🤖 <b>Outreach Bot is online on Railway!</b>\nSend me TikTok links to mark accounts as reached. Use /help for commands.').catch(() => {});
-
-// Start polling
-setInterval(poll, POLL_MS);
-poll();
+console.log('✅ Bot ready for TeleBotHost! Waiting for webhooks...');
