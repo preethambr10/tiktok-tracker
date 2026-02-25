@@ -260,7 +260,7 @@ function generateData(){
       }
       const word=pick(words);
       const prefix=Math.random()>0.55?pick(PREFIXES)+'_':'';
-      const suffix=Math.random()>0.55?'_'+rand(10,999):'';
+      const suffix=Math.random()>0.55?'_'+rand(10,99):'';
       const username=prefix+word+suffix;
       data.push({id:id++,username,followers,niche:niche.name,link:`https://tiktok.com/@${username}`});
     }
@@ -279,12 +279,21 @@ const ALL_DATA = generateData();
 let reachedSet = new Set();
 let botOnline = false;
 
-// Fetch reached.json from local bot server
+// Fetch reached.json from local bot server - FIXED VERSION
 async function syncReached(){
   try {
+    console.log('🔄 Fetching from bot...');
     const res = await fetch('http://localhost:3001/reached?t='+Date.now());
-    if(!res.ok) throw new Error('not ok');
+    console.log('📡 Response status:', res.status);
+    
+    if(!res.ok) {
+      console.error('❌ HTTP error:', res.status);
+      throw new Error('HTTP error ' + res.status);
+    }
+    
     const data = await res.json();
+    console.log('✅ Received data:', data);
+    
     const prev = reachedSet.size;
     const newSet = new Set((data.reached||[]).map(r=>r.username.toLowerCase()));
 
@@ -292,6 +301,7 @@ async function syncReached(){
       botOnline=true;
       setOnline(true);
       document.getElementById('connBanner').classList.remove('show');
+      console.log('🟢 Bot connected!');
     }
 
     document.getElementById('syncInfo').textContent='Last sync: '+new Date().toLocaleTimeString();
@@ -306,7 +316,8 @@ async function syncReached(){
     } else {
       reachedSet=newSet;
     }
-  } catch {
+  } catch (err) {
+    console.error('❌ Fetch error:', err);
     if(botOnline){
       botOnline=false;
       setOnline(false);
