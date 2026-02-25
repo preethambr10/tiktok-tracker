@@ -1,17 +1,23 @@
 /**
- * TikTok Outreach Bot Server - MongoDB Version
- * For Render deployment - FOREVER FREE
+ * TikTok Outreach Bot Server - Final MongoDB Version
+ * For Render deployment - 100% FREE forever
  */
 
 const { MongoClient } = require('mongodb');
 const https = require('https');
 const http = require('http');
 
-// ── CONFIG ────────────────────────────────────────────────────────
-const BOT_TOKEN = process.env.BOT_TOKEN || '8701558725:AAGkYq8bxXdtEFiuWgmLWsOzEFusO87IJQM';
-const CHAT_ID = process.env.CHAT_ID || '2112600021';
-const MONGODB_URI = process.env.MONGODB_URI;
+// ── CONFIG (ALL from environment variables – set these in Render) ──
+const BOT_TOKEN = process.env.BOT_TOKEN;           // MUST be set in Render
+const CHAT_ID   = process.env.CHAT_ID;             // MUST be set in Render
+const MONGODB_URI = process.env.MONGODB_URI;       // MUST be set in Render
 const PORT = process.env.PORT || 3001;
+
+// Exit if critical env vars are missing
+if (!BOT_TOKEN || !CHAT_ID || !MONGODB_URI) {
+  console.error('❌ Missing required environment variables. Exiting.');
+  process.exit(1);
+}
 
 // ── MongoDB Connection ────────────────────────────────────────────
 let db;
@@ -24,8 +30,6 @@ async function connectToMongo() {
     console.log('✅ Connected to MongoDB Atlas');
     db = client.db('tiktok_bot');
     reachedCollection = db.collection('reached');
-    
-    // Create index on username for faster lookups
     await reachedCollection.createIndex({ username: 1 }, { unique: true });
   } catch (err) {
     console.error('❌ MongoDB connection error:', err);
@@ -48,30 +52,18 @@ async function loadReached() {
 }
 
 async function saveReached(username) {
-  try {
-    const timestamp = new Date().toISOString();
-    
-    // Insert new username
-    await reachedCollection.insertOne({
-      username: username.toLowerCase(),
-      timestamp: timestamp,
-      link: `https://tiktok.com/@${username}`
-    });
-    
-    // Update lastUpdated
-    await db.collection('metadata').updateOne(
-      { key: 'lastUpdated' },
-      { $set: { value: timestamp } },
-      { upsert: true }
-    );
-    
-    // Get total count
-    const count = await reachedCollection.countDocuments();
-    return count;
-  } catch (err) {
-    console.error('Error saving to MongoDB:', err);
-    throw err;
-  }
+  const timestamp = new Date().toISOString();
+  await reachedCollection.insertOne({
+    username: username.toLowerCase(),
+    timestamp,
+    link: `https://tiktok.com/@${username}`
+  });
+  await db.collection('metadata').updateOne(
+    { key: 'lastUpdated' },
+    { $set: { value: timestamp } },
+    { upsert: true }
+  );
+  return await reachedCollection.countDocuments();
 }
 
 async function checkIfExists(username) {
@@ -154,13 +146,8 @@ function tgRequest(method, params = {}) {
 }
 
 function sendMessage(text) {
-  return tgRequest('sendMessage', {
-    chat_id: CHAT_ID,
-    text,
-    parse_mode: 'HTML'
-  }).catch(err => {
-    console.error('Failed to send message:', err.message);
-  });
+  return tgRequest('sendMessage', { chat_id: CHAT_ID, text, parse_mode: 'HTML' })
+    .catch(err => console.error('Failed to send message:', err.message));
 }
 
 // ── Extract TikTok username ───────────────────────────────────────
@@ -182,12 +169,7 @@ let offset = 0;
 
 async function poll() {
   try {
-    const data = await tgRequest('getUpdates', {
-      offset,
-      timeout: 10,
-      allowed_updates: ['message']
-    });
-
+    const data = await tgRequest('getUpdates', { offset, timeout: 10, allowed_updates: ['message'] });
     if (!data.ok || !data.result.length) return;
 
     for (const update of data.result) {
@@ -197,7 +179,7 @@ async function poll() {
 
       const text = msg.text.trim();
 
-      // ── Commands ──
+      // Commands
       if (text === '/start' || text === '/help') {
         await sendMessage(
           `👋 <b>TikTok Outreach Bot</b>\n\n` +
@@ -242,7 +224,7 @@ async function poll() {
         continue;
       }
 
-      // ── Handle usernames ──
+      // Handle usernames
       const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
       const results = [];
       let newCount = 0;
@@ -288,10 +270,10 @@ async function start() {
   
   server.listen(PORT, () => {
     console.log(`🌐 Server running on port ${PORT}`);
-    console.log(`   Your Render URL will be: https://your-app.onrender.com`);
+    console.log(`   Your Render URL is: https://your-app.onrender.com (check Render dashboard)`);
   });
   
-  sendMessage('🤖 <b>Outreach Bot is online on Render!</b>\nSend me TikTok links to mark accounts as reached. Use /help for commands.').catch(() => {});
+  sendMessage('🤖 <b>Outreach Bot is online on Render!</b>\nSend me TikTok links to mark accounts as reached. Use /help for commands.');
   
   setInterval(poll, 2000);
   poll();
