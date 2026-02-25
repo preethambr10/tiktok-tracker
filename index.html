@@ -142,7 +142,7 @@
 
   <!-- Connection banner -->
   <div id="connBanner">
-    ⚠️ <b>Bot server not detected.</b> Make sure your Railway bot is running.<br>
+    ⚠️ <b>Bot server not detected.</b> Make sure your Render bot is running.<br>
     Dashboard will work in read-only mode until bot is connected.
   </div>
 
@@ -205,7 +205,7 @@
   </div>
 
   <footer>
-    Dashboard hosted on GitHub Pages · Bot server runs on Railway in the cloud ☁️<br>
+    Dashboard hosted on GitHub Pages · Bot server runs on Render in the cloud ☁️<br>
     Send TikTok links to your Telegram bot → rows turn green ✅ automatically
   </footer>
 </div>
@@ -278,13 +278,13 @@ const ALL_DATA = generateData();
 let reachedSet = new Set();
 let botOnline = false;
 
-// ── IMPORTANT: REPLACE THIS URL WITH YOUR RAILWAY APP URL ─────────
-const BOT_API_URL = 'https://tiktok-tracker-production-a95e.up.railway.app'; // ← CHANGE THIS!
+// ── IMPORTANT: REPLACE THIS URL WITH YOUR RENDER APP URL ─────────
+const BOT_API_URL = 'https://tiktok-tracker-production-a95e.up.railway.app'; // ← CHANGE THIS to your Render URL after deployment
 
 async function syncReached(){
   try {
     console.log('🔄 Fetching from bot...');
-    const res = await fetch(`${BOT_API_URL}/reached?t='+Date.now()`);
+    const res = await fetch(`${BOT_API_URL}/reached?t=${Date.now()}`);
     console.log('📡 Response status:', res.status);
     
     if(!res.ok) {
