@@ -67,8 +67,9 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`🌐 Server running at https://your-railway-app.up.railway.app`);
-  console.log(`   Dashboard should fetch reached accounts from /reached\n`);
+  const url = process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : `http://localhost:${PORT}`;
+  console.log(`🌐 Server running at ${url}`);
+  console.log(`   Dashboard should fetch reached accounts from ${url}/reached\n`);
 });
 
 // ── Telegram API helpers ──────────────────────────────────────────
