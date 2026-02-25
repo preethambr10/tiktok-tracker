@@ -1,11 +1,12 @@
 /**
- * TikTok Outreach Bot Server - Final MongoDB Version
+ * TikTok Outreach Bot Server - Final Version
  * For Render deployment - 100% FREE forever
  */
 
 const { MongoClient } = require('mongodb');
 const https = require('https');
 const http = require('http');
+const url = require('url'); // Added to parse URLs with query strings
 
 // ── CONFIG (ALL from environment variables – set these in Render) ──
 const BOT_TOKEN = process.env.BOT_TOKEN;           // MUST be set in Render
@@ -82,17 +83,26 @@ async function resetAll() {
 
 // ── HTTP Server for Dashboard ─────────────────────────────────────
 const server = http.createServer(async (req, res) => {
+  // Set CORS headers for EVERY response (including errors)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+  // Handle preflight OPTIONS request immediately
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
     return;
   }
 
-  if (req.url === '/reached' || req.url === '/reached.json') {
+  // Set content type for all other responses
+  res.setHeader('Content-Type', 'application/json');
+
+  // Parse the URL to get the path without query parameters (e.g., ?t=...)
+  const parsedUrl = url.parse(req.url, true);
+
+  // Route handling using the pathname
+  if (parsedUrl.pathname === '/reached' || parsedUrl.pathname === '/reached.json') {
     try {
       const data = await loadReached();
       res.writeHead(200);
@@ -101,7 +111,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500);
       res.end(JSON.stringify({ error: 'Could not read from database' }));
     }
-  } else if (req.url === '/status') {
+  } else if (parsedUrl.pathname === '/status') {
     const data = await loadReached();
     res.writeHead(200);
     res.end(JSON.stringify({
