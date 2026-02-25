@@ -8,7 +8,7 @@ const https = require('https');
 const http = require('http');
 
 // ── CONFIG ────────────────────────────────────────────────────────
-const BOT_TOKEN = process.env.BOT_TOKEN || '8701558725:AAEHFB0hMfDlCVWKVHrTngXwcnegNbMUsIA';
+const BOT_TOKEN = process.env.BOT_TOKEN || '8701558725:AAGkYq8bxXdtEFiuWgmLWsOzEFusO87IJQM';
 const CHAT_ID = process.env.CHAT_ID || '2112600021';
 const MONGODB_URI = process.env.MONGODB_URI;
 const PORT = process.env.PORT || 3001;
