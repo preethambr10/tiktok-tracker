@@ -142,8 +142,7 @@
 
   <!-- Connection banner -->
   <div id="connBanner">
-    ⚠️ <b>Bot server not detected.</b> Make sure <code>bot-server.js</code> is running on your PC.<br>
-    Run: <code>node bot-server.js</code> — then refresh this page.<br>
+    ⚠️ <b>Bot server not detected.</b> Make sure your Railway bot is running.<br>
     Dashboard will work in read-only mode until bot is connected.
   </div>
 
@@ -206,7 +205,7 @@
   </div>
 
   <footer>
-    Dashboard hosted on GitHub Pages · Bot server runs locally on your PC<br>
+    Dashboard hosted on GitHub Pages · Bot server runs on Railway in the cloud ☁️<br>
     Send TikTok links to your Telegram bot → rows turn green ✅ automatically
   </footer>
 </div>
@@ -279,11 +278,13 @@ const ALL_DATA = generateData();
 let reachedSet = new Set();
 let botOnline = false;
 
-// Fetch reached.json from local bot server - FIXED VERSION
+// ── IMPORTANT: REPLACE THIS URL WITH YOUR RAILWAY APP URL ─────────
+const BOT_API_URL = 'https://YOUR_RAILWAY_URL.up.railway.app'; // ← CHANGE THIS!
+
 async function syncReached(){
   try {
     console.log('🔄 Fetching from bot...');
-    const res = await fetch('http://localhost:3001/reached?t='+Date.now());
+    const res = await fetch(`${BOT_API_URL}/reached?t='+Date.now()`);
     console.log('📡 Response status:', res.status);
     
     if(!res.ok) {
