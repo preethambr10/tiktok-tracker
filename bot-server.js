@@ -160,12 +160,12 @@ function sendMessage(text) {
     .catch(err => console.error('Failed to send message:', err.message));
 }
 
-// ── Extract TikTok username ───────────────────────────────────────
+// ── Extract TikTok username (only @mentions or tiktok.com links) ──
 function extractUsername(text) {
+  // Only accept explicit @mentions or tiktok.com links (no plain text)
   const patterns = [
-    /tiktok\.com\/@?([a-zA-Z0-9_.]+)/i,
-    /^@([a-zA-Z0-9_.]+)$/,
-    /^([a-zA-Z0-9_.]{3,30})$/,
+    /tiktok\.com\/@?([a-zA-Z0-9_.]+)/i,  // matches https://tiktok.com/@user or tiktok.com/@user
+    /^@([a-zA-Z0-9_.]+)$/                 // matches @username
   ];
   for (const p of patterns) {
     const m = text.trim().match(p);
