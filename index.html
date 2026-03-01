@@ -237,17 +237,17 @@ function fmt(n){if(n>=1000000)return(n/1000000).toFixed(1)+'M';if(n>=1000)return
 function rand(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
 function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
 
-// ── GENERATE 10,000 UNIQUE accounts ───────────────────────────────
+// ── GENERATE 10,000 UNIQUE accounts (fallback if JSON fails) ─────
 function generateData(){
   const data = [];
   let id = 1;
   const perNiche = [1667, 1667, 1667, 1667, 1666, 1666];
-  const usedUsernames = new Set(); // track used usernames
+  const usedUsernames = new Set();
 
   NICHES.forEach((niche, ni) => {
     const words = WORDS[niche.name];
     const count = perNiche[ni];
-    const highCount = Math.round(count * 0.10); // 10% high followers
+    const highCount = Math.round(count * 0.10);
 
     for (let i = 0; i < count; i++) {
       let followers;
@@ -262,14 +262,13 @@ function generateData(){
         else followers = rand(5000, 10000);
       }
 
-      // Generate a unique username
       let username;
       do {
         const word = pick(words);
         const prefix = Math.random() > 0.55 ? pick(PREFIXES) + '_' : '';
         const suffix = Math.random() > 0.55 ? '_' + rand(10, 99) : '';
         username = prefix + word + suffix;
-      } while (usedUsernames.has(username)); // repeat until unique
+      } while (usedUsernames.has(username));
 
       usedUsernames.add(username);
       data.push({
@@ -282,7 +281,6 @@ function generateData(){
     }
   });
 
-  // Shuffle so tiers are mixed
   for (let i = data.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [data[i], data[j]] = [data[j], data[i]];
@@ -290,7 +288,29 @@ function generateData(){
   return data;
 }
 
-const ALL_DATA = generateData();
+// ── LOAD REAL ACCOUNTS FROM JSON ─────────────────────────────────
+let ALL_DATA = [];
+
+async function loadRealAccounts() {
+  try {
+    const response = await fetch('real_accounts.json');
+    const accounts = await response.json();
+    ALL_DATA = accounts.map((acc, index) => ({
+      id: index + 1,
+      username: acc.username,
+      followers: acc.followers || 0,
+      niche: acc.niche || 'Other',
+      link: `https://tiktok.com/@${acc.username}`
+    }));
+    console.log(`✅ Loaded ${ALL_DATA.length} real accounts`);
+  } catch (err) {
+    console.error('Failed to load real accounts, using fallback fake data:', err);
+    ALL_DATA = generateData();
+  }
+  // Re-render everything after data is ready
+  applyFilters();
+  renderPills();
+}
 
 // ── REACHED STATE ─────────────────────────────────────────────────
 let reachedSet = new Set();
@@ -371,7 +391,7 @@ function showToast(msg){
 function isReached(u){return reachedSet.has(u.toLowerCase());}
 
 // ── FILTER STATE ──────────────────────────────────────────────────
-let filtered=[...ALL_DATA];
+let filtered=[];
 let currentNiche='All',currentSort='followers_desc',currentPage=1,currentStatus='all',searchTerm='';
 const PER_PAGE=25;
 
@@ -501,10 +521,12 @@ document.querySelectorAll('th.sortable').forEach(th=>{
 });
 
 // ── INIT ──────────────────────────────────────────────────────────
-renderPills();
-applyFilters();
-syncReached();
-setInterval(syncReached,5000); // poll every 5s
+// Load real accounts first, then start the rest
+loadRealAccounts().then(() => {
+  renderPills();      // already called inside loadRealAccounts, but safe
+  syncReached();
+  setInterval(syncReached, 5000);
+});
 </script>
 </body>
 </html>
