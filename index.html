@@ -98,8 +98,6 @@
   .uname a{color:var(--cyan);text-decoration:none;font-weight:600;}
   .uname a:hover{text-decoration:underline;}
   .ntag{display:inline-block;padding:2px 9px;border-radius:100px;font-size:9px;font-weight:700;}
-  .fbar{display:flex;align-items:center;gap:7px;}
-  .fmini{height:3px;border-radius:2px;min-width:3px;}
   .rnum{color:var(--muted);font-size:10px;}
 
   /* PAGINATION */
@@ -192,7 +190,6 @@
           <tr>
             <th>#</th>
             <th class="sortable" data-col="username">Username ⇅</th>
-            <th class="sortable sorted" data-col="followers">Followers ↓</th>
             <th>Niche</th>
             <th>Status</th>
             <th>Profile Link</th>
@@ -221,6 +218,7 @@ const NICHES = [
   {name:'Gaming',            emoji:'🎮', color:'#25f4ee'},
   {name:'Music',             emoji:'🎵', color:'#f472b6'},
   {name:'Transitional Edit', emoji:'✂️', color:'#facc15'},
+  {name:'Other',             emoji:'❓', color:'#888888'}
 ];
 
 const PREFIXES = ['the','real','official','daily','pro','top','best','hot','viral','mega','super','ultra','xo','og','idk','not','just','only','pure','raw'];
@@ -298,7 +296,7 @@ async function loadRealAccounts() {
     ALL_DATA = accounts.map((acc, index) => ({
       id: index + 1,
       username: acc.username,
-      followers: acc.followers || 0,
+      followers: 0, // force to 0
       niche: acc.niche || 'Other',
       link: `https://tiktok.com/@${acc.username}`
     }));
@@ -412,15 +410,12 @@ function renderProgress(){
 // ── STATS ─────────────────────────────────────────────────────────
 function renderStats(){
   const total=filtered.length;
-  const totalF=filtered.reduce((s,a)=>s+a.followers,0);
-  const avg=total?Math.round(totalF/total):0;
   const reached=filtered.filter(a=>isReached(a.username)).length;
   const niches=new Set(filtered.map(a=>a.niche)).size;
   document.getElementById('statsRow').innerHTML=`
     <div class="stat"><div class="stat-lbl">Showing</div><div class="stat-val c">${total.toLocaleString()}</div></div>
     <div class="stat"><div class="stat-lbl">Reached</div><div class="stat-val g">${reached.toLocaleString()}</div></div>
     <div class="stat"><div class="stat-lbl">Unreached</div><div class="stat-val r">${(total-reached).toLocaleString()}</div></div>
-    <div class="stat"><div class="stat-lbl">Avg Followers</div><div class="stat-val">${fmt(avg)}</div></div>
     <div class="stat"><div class="stat-lbl">Active Niches</div><div class="stat-val y">${niches}</div></div>
   `;
 }
@@ -429,17 +424,14 @@ function renderStats(){
 function renderTable(){
   const start=(currentPage-1)*PER_PAGE;
   const page=filtered.slice(start,start+PER_PAGE);
-  const maxF=200000;
   document.getElementById('cntBadge').textContent=`${filtered.length.toLocaleString()} accounts`;
   document.getElementById('tBody').innerHTML=page.map((a,i)=>{
     const rank=start+i+1;
     const color=getNicheColor(a.niche);
     const reached=isReached(a.username);
-    const barW=Math.max(3,Math.round(a.followers/maxF*90));
     return `<tr class="row ${reached?'is-reached':'is-unreached'}">
       <td class="rnum">${rank}</td>
       <td class="uname"><a href="${a.link}" target="_blank">@${a.username}</a></td>
-      <td><div class="fbar"><span style="min-width:54px">${fmt(a.followers)}</span><div class="fmini" style="width:${barW}px;background:${color}"></div></div></td>
       <td><span class="ntag" style="background:${color}22;color:${color}">${getNicheEmoji(a.niche)} ${a.niche}</span></td>
       <td>${reached?'<span class="spill reached">✅ Reached</span>':'<span class="spill unreached">⏳ Pending</span>'}</td>
       <td><a href="${a.link}" target="_blank" style="color:var(--muted);font-size:10px;text-decoration:none">↗ open</a></td>
@@ -521,9 +513,7 @@ document.querySelectorAll('th.sortable').forEach(th=>{
 });
 
 // ── INIT ──────────────────────────────────────────────────────────
-// Load real accounts first, then start the rest
 loadRealAccounts().then(() => {
-  renderPills();      // already called inside loadRealAccounts, but safe
   syncReached();
   setInterval(syncReached, 5000);
 });
