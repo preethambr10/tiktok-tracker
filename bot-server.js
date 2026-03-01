@@ -6,13 +6,16 @@
 const { MongoClient } = require('mongodb');
 const https = require('https');
 const http = require('http');
-const url = require('url'); // Added to parse URLs with query strings
+const url = require('url');
 
 // ── CONFIG (ALL from environment variables – set these in Render) ──
-const BOT_TOKEN = process.env.BOT_TOKEN;           // MUST be set in Render
-const CHAT_ID   = process.env.CHAT_ID;             // MUST be set in Render
-const MONGODB_URI = process.env.MONGODB_URI;       // MUST be set in Render
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const CHAT_ID   = process.env.CHAT_ID;
+const MONGODB_URI = process.env.MONGODB_URI;
 const PORT = process.env.PORT || 3001;
+
+// Total number of accounts in your dashboard (update this if your list changes)
+const TOTAL_ACCOUNTS = 2479;
 
 // Exit if critical env vars are missing
 if (!BOT_TOKEN || !CHAT_ID || !MONGODB_URI) {
@@ -83,25 +86,19 @@ async function resetAll() {
 
 // ── HTTP Server for Dashboard ─────────────────────────────────────
 const server = http.createServer(async (req, res) => {
-  // Set CORS headers for EVERY response (including errors)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle preflight OPTIONS request immediately
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
     return;
   }
 
-  // Set content type for all other responses
   res.setHeader('Content-Type', 'application/json');
-
-  // Parse the URL to get the path without query parameters (e.g., ?t=...)
   const parsedUrl = url.parse(req.url, true);
 
-  // Route handling using the pathname
   if (parsedUrl.pathname === '/reached' || parsedUrl.pathname === '/reached.json') {
     try {
       const data = await loadReached();
@@ -160,12 +157,11 @@ function sendMessage(text) {
     .catch(err => console.error('Failed to send message:', err.message));
 }
 
-// ── Extract TikTok username (only @mentions or tiktok.com links) ──
+// ── Extract TikTok username ───────────────────────────────────────
 function extractUsername(text) {
-  // Only accept explicit @mentions or tiktok.com links (no plain text)
   const patterns = [
-    /tiktok\.com\/@?([a-zA-Z0-9_.]+)/i,  // matches https://tiktok.com/@user or tiktok.com/@user
-    /^@([a-zA-Z0-9_.]+)$/                 // matches @username
+    /tiktok\.com\/@?([a-zA-Z0-9_.]+)/i,
+    /^@([a-zA-Z0-9_.]+)$/
   ];
   for (const p of patterns) {
     const m = text.trim().match(p);
@@ -205,12 +201,12 @@ async function poll() {
 
       if (text === '/stats') {
         const data = await loadReached();
-        const pct = (data.reached.length / 10000 * 100).toFixed(1);
+        const pct = (data.reached.length / TOTAL_ACCOUNTS * 100).toFixed(1);
         await sendMessage(
           `📊 <b>Outreach Stats</b>\n\n` +
-          `✅ Reached: <b>${data.reached.length.toLocaleString()}</b> / 10,000\n` +
+          `✅ Reached: <b>${data.reached.length.toLocaleString()}</b> / ${TOTAL_ACCOUNTS}\n` +
           `📈 Progress: <b>${pct}%</b>\n` +
-          `⏳ Remaining: <b>${(10000 - data.reached.length).toLocaleString()}</b>\n` +
+          `⏳ Remaining: <b>${(TOTAL_ACCOUNTS - data.reached.length).toLocaleString()}</b>\n` +
           `🕒 Last updated: ${data.lastUpdated ? new Date(data.lastUpdated).toLocaleString() : 'never'}`
         );
         continue;
@@ -259,10 +255,10 @@ async function poll() {
       }
 
       const total = await reachedCollection.countDocuments();
-      const pct = (total / 10000 * 100).toFixed(1);
+      const pct = (total / TOTAL_ACCOUNTS * 100).toFixed(1);
       const summary = results.join('\n');
       await sendMessage(
-        `${summary}\n\n📊 Total reached: <b>${total.toLocaleString()}</b> / 10,000 (${pct}%)`
+        `${summary}\n\n📊 Total reached: <b>${total.toLocaleString()}</b> / ${TOTAL_ACCOUNTS} (${pct}%)`
       );
     }
   } catch (err) {
