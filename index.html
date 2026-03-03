@@ -150,12 +150,14 @@
       <div class="prog-label">Overall Outreach Progress</div>
       <div class="prog-pct" id="progPct">0%</div>
     </div>
-    <div class="prog-track"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
-    <div class="prog-sub">
-      <div class="pi-item g">✅ Reached: <b id="reachedCnt">0</b></div>
-      <div class="pi-item r">⏳ Unreached: <b id="unreachedCnt">10,000</b></div>
-      <div class="pi-item m">Total: <b>10,000</b></div>
-    </div>
+    <div class="prog-track">
+  <div class="prog-fill" id="progFill" style="width:0%"></div>
+</div>
+   <div class="prog-sub">
+  <div class="pi-item g">✅ Reached: <b id="reachedCnt">0</b></div>
+  <div class="pi-item r">⏳ Unreached: <b id="unreachedCnt">10,000</b></div>
+  <div class="pi-item m">Total: <b id="totalCnt">10,000</b></div>
+</div>
   </div>
 
   <!-- Stats -->
@@ -398,14 +400,16 @@ function getNicheEmoji(n){return NICHES.find(x=>x.name===n)?.emoji||'';}
 
 // ── PROGRESS ──────────────────────────────────────────────────────
 function renderProgress(){
-  const total=ALL_DATA.length;
-  const reached=reachedSet.size;
-  const pct=total?(reached/total*100).toFixed(1):0;
-  document.getElementById('progPct').textContent=pct+'%';
-  document.getElementById('progFill').style.width=pct+'%';
-  document.getElementById('reachedCnt').textContent=reached.toLocaleString();
-  document.getElementById('unreachedCnt').textContent=(total-reached).toLocaleString();
+  const total = ALL_DATA.length; // actual total number of accounts
+  const reached = reachedSet.size;
+  const pct = total ? (reached / total * 100).toFixed(1) : 0;
+  document.getElementById('progPct').textContent = pct + '%';
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('reachedCnt').textContent = reached.toLocaleString();
+  document.getElementById('unreachedCnt').textContent = (total - reached).toLocaleString();
+  document.getElementById('totalCnt').textContent = total.toLocaleString(); // update total dynamically
 }
+
 
 // ── STATS ─────────────────────────────────────────────────────────
 function renderStats(){
